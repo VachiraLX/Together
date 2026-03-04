@@ -1,0 +1,39 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "together-app-vachira",
+          "appId": "1:678560053883:android:c47abb3a89b2d0226d40de",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "together-app-vachira",
+          "configurations": {
+            "android": "1:678560053883:android:c47abb3a89b2d0226d40de",
+            "ios": "1:678560053883:ios:35bbdc5e1ab40bbe6d40de",
+            "macos": "1:678560053883:ios:35bbdc5e1ab40bbe6d40de",
+            "web": "1:678560053883:web:91d545ceb7c1bf746d40de",
+            "windows": "1:678560053883:web:d3a1a4d018d28a626d40de"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

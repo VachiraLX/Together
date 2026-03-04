@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "678560053883",
+    "project_id": "together-app-vachira",
+    "storage_bucket": "together-app-vachira.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:678560053883:android:c47abb3a89b2d0226d40de",
+        "android_client_info": {
+          "package_name": "com.example.together"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAt0H-fdBn1bzEUP0M30iRXcVjsT22-dnQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
