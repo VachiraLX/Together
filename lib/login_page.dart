@@ -56,6 +56,85 @@ class _LoginPageState extends State<LoginPage> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> forgotPassword() async {
+    // ถ้ามี email อยู่แล้วในช่อง ใช้เลย ถ้าไม่มีให้ dialog ถาม
+    final email = emailController.text.trim();
+
+    if (email.isEmpty) {
+      // แสดง dialog ให้ใส่ email
+      final controller = TextEditingController();
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
+          title: const Text("Forgot Password",
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("ใส่ email ที่ลงทะเบียนไว้",
+                  style: TextStyle(fontSize: 13, color: Colors.black54)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  hintText: "email@example.com",
+                  filled: true,
+                  fillColor: const Color(0xfff0f7fc),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text("ยกเลิก",
+                  style: TextStyle(color: Colors.black45)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xff5aaee0),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text("ส่ง"),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true && controller.text.trim().isNotEmpty) {
+        await _sendResetEmail(controller.text.trim());
+      }
+    } else {
+      await _sendResetEmail(email);
+    }
+  }
+
+  Future<void> _sendResetEmail(String email) async {
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("ส่ง email รีเซ็ตรหัสผ่านไปที่ \$email แล้ว ✅"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      showError(e.message ?? "เกิดข้อผิดพลาด");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -183,9 +262,7 @@ class _LoginPageState extends State<LoginPage> {
                         style: TextStyle(fontSize: 13, color: Colors.black54)),
                     const Spacer(),
                     GestureDetector(
-                      onTap: () {
-                        // TODO: Forgot password
-                      },
+                      onTap: forgotPassword,
                       child: const Text(
                         "Forgot password",
                         style: TextStyle(

@@ -15,10 +15,29 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String selectedCategory = 'All';
+  String selectedLocation = 'All';
 
   final List<String> categories = [
     'All', 'food', 'exercise', 'Travel', 'concert'
   ];
+
+  final List<String> locations = [
+    'All', 'General', 'MFU', 'RSU', 'CMU', 
+  ];
+
+  Stream<QuerySnapshot> _buildQuery() {
+    if (selectedCategory == 'All') {
+      return FirebaseFirestore.instance
+          .collection('activities')
+          .orderBy('createdAt', descending: true)
+          .snapshots();
+    }
+    return FirebaseFirestore.instance
+        .collection('activities')
+        .where('category', isEqualTo: selectedCategory)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,12 +57,90 @@ class _HomePageState extends State<HomePage> {
                       context,
                       MaterialPageRoute(builder: (_) => const ProfilePage()),
                     ),
-                    child: _ProfileAvatar(),
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xff5aaee0), width: 2),
+                      ),
+                      child: const Icon(Icons.person_outline,
+                          color: Color(0xff5aaee0), size: 24),
+                    ),
                   ),
 
-                  const Spacer(),
+                  const SizedBox(width: 5),
 
-                  // Create activity button (+ icon)
+                  // ---- Location Dropdown ----
+                  Expanded(
+                    child: Container(
+                      height: 38,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: selectedLocation != 'All'
+                              ? const Color(0xff3a8fc7)
+                              : Colors.black12,
+                          width: 1.2,
+                        ),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: selectedLocation,
+                          icon: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: selectedLocation != 'All'
+                                ? const Color(0xff3a8fc7)
+                                : Colors.black38,
+                            size: 18,
+                          ),
+                          isExpanded: true,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87),
+                          items: locations.map((loc) {
+                            return DropdownMenuItem<String>(
+                              value: loc,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    loc == 'All'
+                                        ? Icons.public
+                                        : Icons.location_on,
+                                    size: 14,
+                                    color: loc == selectedLocation
+                                        ? const Color(0xff3a8fc7)
+                                        : Colors.black38,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    loc == 'All' ? 'All Location' : loc,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: loc == selectedLocation
+                                          ? const Color(0xff3a8fc7)
+                                          : Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) =>
+                              setState(() => selectedLocation = val!),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  // ✅ Create activity button (+ icon)
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
@@ -105,27 +202,27 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             // ---- Activity List from Firestore ----
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: selectedCategory == 'All'
-                    ? FirebaseFirestore.instance
-                        .collection('activities')
-                        .orderBy('createdAt', descending: true)
-                        .snapshots()
-                    : FirebaseFirestore.instance
-                        .collection('activities')
-                        .where('category', isEqualTo: selectedCategory)
-                        .orderBy('createdAt', descending: true)
-                        .snapshots(),
+                stream: _buildQuery(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final docs = snapshot.data?.docs ?? [];
+                  // filter location ฝั่ง client (ไม่ต้องสร้าง composite index เพิ่ม)
+                  final allDocs = snapshot.data?.docs ?? [];
+                  final docs = selectedLocation == 'All'
+                      ? allDocs
+                      : allDocs.where((d) {
+                          final data = d.data() as Map<String, dynamic>;
+                          return (data['location'] as String? ?? '')
+                              .toLowerCase()
+                              .contains(selectedLocation.toLowerCase());
+                        }).toList();
 
                   if (docs.isEmpty) {
                     return Center(
@@ -137,12 +234,12 @@ class _HomePageState extends State<HomePage> {
                               color: Colors.black.withOpacity(0.15)),
                           const SizedBox(height: 14),
                           const Text(
-                            "No activities yet",
+                            "ยังไม่มีกิจกรรม",
                             style: TextStyle(fontSize: 16, color: Colors.black38),
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            "Tap + to create your first activity",
+                            "กด + เพื่อสร้างกิจกรรมแรกของคุณ",
                             style: TextStyle(fontSize: 13, color: Colors.black26),
                           ),
                         ],
@@ -233,96 +330,9 @@ class _NotificationBell extends StatelessWidget {
   }
 }
 
-// ---- Profile Avatar Widget ----
-class _ProfileAvatar extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (uid.isEmpty) {
-      return Container(
-        width: 42, height: 42,
-        decoration: BoxDecoration(
-          color: Colors.white, shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xff5aaee0), width: 2),
-        ),
-        child: const Icon(Icons.person_outline, color: Color(0xff5aaee0), size: 24),
-      );
-    }
-
-    if (uid.isEmpty) return Container(
-      width: 42, height: 42,
-      decoration: BoxDecoration(
-        color: Colors.white, shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xff5aaee0), width: 2),
-      ),
-      child: const Icon(Icons.person_outline, color: Color(0xff5aaee0), size: 24),
-    );
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
-      builder: (context, snapshot) {
-        final photoUrl = (snapshot.data?.data() as Map<String, dynamic>?)?['photoUrl'] as String? ?? '';
-        final authPhotoUrl = FirebaseAuth.instance.currentUser?.photoURL ?? '';
-        final finalUrl = photoUrl.isNotEmpty ? photoUrl : authPhotoUrl;
-
-        return Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xff5aaee0), width: 2),
-          ),
-          child: ClipOval(
-            child: finalUrl.isNotEmpty
-                ? Image.network(
-                    finalUrl,
-                    width: 42,
-                    height: 42,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.person_outline,
-                      color: Color(0xff5aaee0),
-                      size: 24,
-                    ),
-                  )
-                : const Icon(Icons.person_outline,
-                    color: Color(0xff5aaee0), size: 24),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _ActivityCard extends StatelessWidget {
   final Map<String, dynamic> activity;
   const _ActivityCard({required this.activity});
-
-  Widget _buildActivityImage(String? imageUrl) {
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      return Image.network(
-        imageUrl,
-        height: 150,
-        width: double.infinity,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _imagePlaceholder(),
-        loadingBuilder: (_, child, progress) {
-          if (progress == null) return child;
-          return _imagePlaceholder();
-        },
-      );
-    }
-    return _imagePlaceholder();
-  }
-
-  Widget _imagePlaceholder() {
-    return Container(
-      height: 150,
-      width: double.infinity,
-      color: const Color(0xffcce3f5),
-      child: const Icon(Icons.image_outlined, size: 48, color: Colors.white54),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -348,7 +358,13 @@ class _ActivityCard extends StatelessWidget {
           ClipRRect(
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(16)),
-            child: _buildActivityImage(activity['imageUrl']),
+            child: Container(
+              height: 150,
+              width: double.infinity,
+              color: const Color(0xffcce3f5),
+              child: const Icon(Icons.image_outlined,
+                  size: 48, color: Colors.white54),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.all(12),
@@ -363,8 +379,9 @@ class _ActivityCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    _HostAvatar(hostId: activity['hostId'] ?? ''),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.person_outline,
+                        size: 20, color: Colors.black38),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -421,58 +438,4 @@ class _ActivityCard extends StatelessWidget {
       ),
     );
   }
-}
-
-// ---- Host Avatar Widget ----
-class _HostAvatar extends StatelessWidget {
-  final String hostId;
-  const _HostAvatar({required this.hostId});
-
-  @override
-  Widget build(BuildContext context) {
-    if (hostId.isEmpty) {
-      return _placeholder();
-    }
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance.collection('users').doc(hostId).get(),
-      builder: (_, snap) {
-        final photoUrl =
-            (snap.data?.data() as Map<String, dynamic>?)?['photoUrl']
-                as String? ??
-                '';
-        return Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: const Color(0xffcce3f5),
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xff5aaee0), width: 1.5),
-          ),
-          child: ClipOval(
-            child: photoUrl.isNotEmpty
-                ? Image.network(
-                    photoUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _icon(),
-                  )
-                : _icon(),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _placeholder() => Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: const Color(0xffcce3f5),
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xff5aaee0), width: 1.5),
-        ),
-        child: _icon(),
-      );
-
-  Widget _icon() =>
-      const Icon(Icons.person_outline, size: 20, color: Color(0xff5aaee0));
 }
