@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'home_page.dart';
 import 'register_page.dart';
 
@@ -13,7 +14,6 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  bool rememberMe = false;
   bool isLoading = false;
 
   @override
@@ -66,8 +66,8 @@ class _LoginPageState extends State<LoginPage> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text("Forgot Password",
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
           content: Column(
@@ -94,8 +94,8 @@ class _LoginPageState extends State<LoginPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text("ยกเลิก",
-                  style: TextStyle(color: Colors.black45)),
+              child:
+                  const Text("ยกเลิก", style: TextStyle(color: Colors.black45)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
@@ -125,13 +125,50 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("ส่ง email รีเซ็ตรหัสผ่านไปที่ \$email แล้ว ✅"),
+            content: Text("ส่ง email รีเซ็ตรหัสผ่านไปที่ $email แล้ว ✅"),
             backgroundColor: Colors.green,
           ),
         );
       }
     } on FirebaseAuthException catch (e) {
       showError(e.message ?? "เกิดข้อผิดพลาด");
+    }
+  }
+
+  Future<void> signInWithGoogle() async {
+    try {
+      // เริ่ม Google Sign-In flow
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+
+      // ถ้า user กด cancel
+      if (googleUser == null) return;
+
+      // เอา auth details จาก Google
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // สร้าง Firebase credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in กับ Firebase
+      setState(() => isLoading = true);
+      await FirebaseAuth.instance.signInWithCredential(credential);
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomePage()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      showError(e.message ?? "Google Sign-In failed");
+    } catch (e) {
+      showError("เกิดข้อผิดพลาด: $e");
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -243,36 +280,20 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 10),
 
-                // ---- Remember me + Forgot password ----
-                Row(
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: Checkbox(
-                        value: rememberMe,
-                        onChanged: (v) => setState(() => rememberMe = v!),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4)),
-                        side: const BorderSide(color: Colors.black38),
+                // ---- Forgot password ----
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: forgotPassword,
+                    child: const Text(
+                      "Forgot password",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xff3a8fc7),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    const Text("Remember me",
-                        style: TextStyle(fontSize: 13, color: Colors.black54)),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: forgotPassword,
-                      child: const Text(
-                        "Forgot password",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Color(0xff3a8fc7),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
 
                 const SizedBox(height: 20),
@@ -332,9 +353,7 @@ class _LoginPageState extends State<LoginPage> {
                   width: double.infinity,
                   height: 50,
                   child: OutlinedButton(
-                    onPressed: () {
-                      // TODO: Google Sign-In
-                    },
+                    onPressed: isLoading ? null : signInWithGoogle,
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       side: const BorderSide(color: Colors.black12),
@@ -435,8 +454,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: Color(0xff5aaee0), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xff5aaee0), width: 1.5),
         ),
       ),
     );

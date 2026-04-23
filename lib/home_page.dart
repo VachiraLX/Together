@@ -22,7 +22,7 @@ class _HomePageState extends State<HomePage> {
   ];
 
   final List<String> locations = [
-    'All', 'General', 'MFU', 'RSU', 'CMU', 
+    'All', 'General', 'MFU', 'RSU', 'CMU', 'Other'
   ];
 
   Stream<QuerySnapshot> _buildQuery() {
@@ -70,7 +70,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
 
-                  const SizedBox(width: 5),
+                  const SizedBox(width: 10),
 
                   // ---- Location Dropdown ----
                   Expanded(
@@ -145,7 +145,10 @@ class _HomePageState extends State<HomePage> {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => const CreateActivityPage()),
+                        builder: (_) => CreateActivityPage(
+                          initialLocation: selectedLocation,
+                        ),
+                      ),
                     ),
                     child: Container(
                       width: 42,

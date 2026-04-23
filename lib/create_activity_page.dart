@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,7 +6,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 class CreateActivityPage extends StatefulWidget {
-  const CreateActivityPage({super.key});
+  final String initialLocation;
+  const CreateActivityPage({super.key, this.initialLocation = 'General'});
 
   @override
   State<CreateActivityPage> createState() => _CreateActivityPageState();
@@ -23,9 +23,24 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
   TimeOfDay? startTime;
   TimeOfDay? endTime;
   String selectedCategory = 'exercise';
+  late String selectedLocationPreset;
   bool isLoading = false;
 
-  XFile? pickedImage;
+  final List<String> locationPresets = [
+    'General', 'MFU', 'RSU', 'CMU', 'Other'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // pre-fill location จาก home page dropdown
+    final loc = widget.initialLocation;
+    selectedLocationPreset = (loc == 'All') ? 'General' : loc;
+    if (selectedLocationPreset != 'Other') {
+      locationController.text = selectedLocationPreset;
+    }
+  }
+
   Uint8List? pickedImageBytes;
   final ImagePicker _picker = ImagePicker();
 
@@ -46,16 +61,13 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
         await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     if (image != null) {
       final bytes = await image.readAsBytes();
-      setState(() {
-        pickedImage = image;
-        pickedImageBytes = bytes;
-      });
+      setState(() => pickedImageBytes = bytes);
     }
   }
 
-  // ---- Upload image to Firebase Storage (Web + Mobile) ----
+  // ---- Upload image to Firebase Storage ----
   Future<String?> uploadImage(String activityId) async {
-    if (pickedImage == null || pickedImageBytes == null) return null;
+    if (pickedImageBytes == null) return null;
     try {
       final ref = FirebaseStorage.instance
           .ref()
@@ -144,24 +156,24 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
 
   Future<void> createActivity() async {
     if (titleController.text.trim().isEmpty) {
-      showError("Please enter activity title"); return;
+      showError("กรุณาใส่ชื่อกิจกรรม"); return;
     }
     if (descController.text.trim().isEmpty) {
-      showError("Please enter a description"); return;
+      showError("กรุณาใส่คำอธิบาย"); return;
     }
     if (selectedDate == null) {
-      showError("Please select a date"); return;
+      showError("กรุณาเลือกวันที่"); return;
     }
     if (startTime == null || endTime == null) {
-      showError("Please select start and end time"); return;
+      showError("กรุณาเลือกเวลาเริ่มและสิ้นสุด"); return;
     }
     if (locationController.text.trim().isEmpty) {
-      showError("Please enter a location"); return;
+      showError("กรุณาใส่สถานที่"); return;
     }
     if (maxController.text.trim().isEmpty ||
         int.tryParse(maxController.text.trim()) == null ||
         int.parse(maxController.text.trim()) < 1) {
-      showError("Please enter a valid number of participants"); return;
+      showError("กรุณาใส่จำนวนคนที่ถูกต้อง"); return;
     }
 
     setState(() => isLoading = true);
@@ -171,11 +183,11 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
       final displayName =
           user?.displayName ?? user?.email?.split('@').first ?? 'Unknown';
 
-      // Create doc first to get id for image filename
+      // สร้าง doc ก่อนเพื่อเอา id ไปใช้ตั้งชื่อไฟล์รูป
       final docRef =
           FirebaseFirestore.instance.collection('activities').doc();
 
-      // Upload image first (if any)
+      // อัปโหลดรูปก่อน (ถ้ามี)
       String? imageUrl = await uploadImage(docRef.id);
 
       await docRef.set({
@@ -197,11 +209,11 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Activity created successfully!")),
+          const SnackBar(content: Text("สร้างกิจกรรมสำเร็จ! 🎉")),
         );
       }
     } catch (e) {
-      showError("An error occurred: $e");
+      showError("เกิดข้อผิดพลาด: $e");
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -239,7 +251,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
                   ),
                   const SizedBox(width: 14),
                   const Text(
-                    "Create Activity",
+                    "สร้างกิจกรรม",
                     style: TextStyle(
                         fontSize: 20, fontWeight: FontWeight.w800),
                   ),
@@ -268,8 +280,8 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
 
-                      // ---- Activity Image ----
-                      _label("Activity Image"),
+                      // ---- รูปกิจกรรม ----
+                      _label("รูปกิจกรรม"),
                       const SizedBox(height: 6),
                       GestureDetector(
                         onTap: pickImage,
@@ -302,7 +314,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
                                         size: 40, color: Colors.black26),
                                     SizedBox(height: 8),
                                     Text(
-                                      "Tap to select image",
+                                      "แตะเพื่อเลือกรูป",
                                       style: TextStyle(
                                           fontSize: 13,
                                           color: Colors.black38),
@@ -314,26 +326,26 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
 
                       const SizedBox(height: 16),
 
-                      // ---- Activity Title ----
-                      _label("Activity Title"),
+                      // ---- ชื่อกิจกรรม ----
+                      _label("ชื่อกิจกรรม"),
                       const SizedBox(height: 6),
                       _inputField(
-                        hint: "Enter activity title",
+                        hint: "ใส่ชื่อกิจกรรม",
                         icon: Icons.title,
                         controller: titleController,
                       ),
 
                       const SizedBox(height: 16),
 
-                      // ---- Description ----
-                      _label("Description"),
+                      // ---- คำอธิบาย ----
+                      _label("คำอธิบาย"),
                       const SizedBox(height: 6),
                       TextField(
                         controller: descController,
                         maxLines: 3,
                         style: const TextStyle(fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: "Describe your activity...",
+                          hintText: "อธิบายกิจกรรมของคุณ...",
                           hintStyle: const TextStyle(
                               color: Colors.black38, fontSize: 13),
                           filled: true,
@@ -353,8 +365,8 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
 
                       const SizedBox(height: 16),
 
-                      // ---- Category ----
-                      _label("Category"),
+                      // ---- หมวดหมู่ ----
+                      _label("หมวดหมู่"),
                       const SizedBox(height: 6),
                       Container(
                         decoration: BoxDecoration(
@@ -381,8 +393,8 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
 
                       const SizedBox(height: 16),
 
-                      // ---- Date ----
-                      _label("Date"),
+                      // ---- วันที่ ----
+                      _label("วันที่"),
                       const SizedBox(height: 6),
                       GestureDetector(
                         onTap: pickDate,
@@ -402,7 +414,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
                               Text(
                                 selectedDate != null
                                     ? formatDate(selectedDate!)
-                                    : "Select date",
+                                    : "เลือกวันที่",
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: selectedDate != null
@@ -417,8 +429,8 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
 
                       const SizedBox(height: 16),
 
-                      // ---- Time ----
-                      _label("Time"),
+                      // ---- เวลา ----
+                      _label("เวลา"),
                       const SizedBox(height: 6),
                       Row(
                         children: [
@@ -440,7 +452,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
                                     Text(
                                       startTime != null
                                           ? formatTime(startTime!)
-                                          : "Start",
+                                          : "เริ่ม",
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: startTime != null
@@ -477,7 +489,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
                                     Text(
                                       endTime != null
                                           ? formatTime(endTime!)
-                                          : "End",
+                                          : "สิ้นสุด",
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: endTime != null
@@ -495,22 +507,82 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
 
                       const SizedBox(height: 16),
 
-                      // ---- Location ----
-                      _label("Location"),
+                      // ---- สถานที่ ----
+                      _label("สถานที่"),
                       const SizedBox(height: 6),
+                      // Preset location selector
+                      SizedBox(
+                        height: 36,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: locationPresets.length,
+                          itemBuilder: (_, i) {
+                            final loc = locationPresets[i];
+                            final isSelected = loc == selectedLocationPreset;
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedLocationPreset = loc;
+                                  if (loc != 'Other') {
+                                    locationController.text = loc;
+                                  } else {
+                                    locationController.clear();
+                                  }
+                                });
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(0xff3a8fc7)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xff3a8fc7)
+                                        : Colors.black12,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.location_on,
+                                        size: 12,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.black38),
+                                    const SizedBox(width: 4),
+                                    Text(loc,
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: isSelected
+                                                ? Colors.white
+                                                : Colors.black54)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       _inputField(
-                        hint: "Enter location",
+                        hint: selectedLocationPreset == 'Other'
+                            ? "พิมพ์สถานที่เพิ่มเติม"
+                            : "พิมพ์รายละเอียดสถานที่ (เช่น อาคาร E-Park ชั้น 3)",
                         icon: Icons.location_on_outlined,
                         controller: locationController,
                       ),
 
                       const SizedBox(height: 16),
 
-                      // ---- Max Participants ----
-                      _label("Max Participants"),
+                      // ---- จำนวนคน ----
+                      _label("จำนวนคนสูงสุด"),
                       const SizedBox(height: 6),
                       _inputField(
-                        hint: "e.g. 10",
+                        hint: "เช่น 10",
                         icon: Icons.people_outline,
                         controller: maxController,
                         keyboardType: TextInputType.number,
@@ -540,7 +612,7 @@ class _CreateActivityPageState extends State<CreateActivityPage> {
                                       strokeWidth: 2.5),
                                 )
                               : const Text(
-                                  "Create Activity",
+                                  "สร้างกิจกรรม",
                                   style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700),
